@@ -6,7 +6,13 @@ defmodule Server do
   use Application
 
   def start(_type, _args) do
-    Supervisor.start_link([{Task, fn -> Server.listen() end}], strategy: :one_for_one)
+    Supervisor.start_link(
+      [
+        {Task.Supervisor, name: __MODULE__.TaskSupervisor},
+        {Task, fn -> Server.listen() end}
+      ],
+      strategy: :one_for_one
+    )
   end
 
   @doc """
@@ -17,29 +23,35 @@ defmodule Server do
     IO.puts("Logs from your program will appear here!")
 
     {:ok, socket} = :gen_tcp.listen(6379, [:binary, active: false, reuseaddr: true])
-    {:ok, client} = :gen_tcp.accept(socket)
 
-    loop_acceptor(client)
+    loop_acceptor(socket)
   end
 
   @spec serve(:gen_tcp.socket()) :: any
   defp loop_acceptor(socket) do
-    serve(socket)
+    {:ok, client} = :gen_tcp.accept(socket)
+
+    {:ok, pid} =
+      Task.Supervisor.start_child(
+        __MODULE__.TaskSupervisor,
+        fn -> serve(client) end
+      )
+
+    :ok = :gen_tcp.controlling_process(client, pid)
+
     loop_acceptor(socket)
   end
 
   @spec serve(:gen_tcp.socket()) :: any
   defp serve(socket) do
-    socket
-    |> read()
-    |> write("+PONG\r\n")
+    with {:ok, _} <- do_recv(socket) do
+      write(socket, "+PONG\r\n")
+      serve(socket)
+    end
   end
 
-  defp read(socket) do
-    case :gen_tcp.recv(socket, 0) do
-      {:ok, _} -> socket
-      _ -> socket
-    end
+  defp do_recv(socket) do
+    :gen_tcp.recv(socket, 0)
   end
 
   defp write(socket, packet) do
