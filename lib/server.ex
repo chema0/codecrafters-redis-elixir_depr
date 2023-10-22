@@ -18,6 +18,8 @@ defmodule Server do
 
     # Uncomment this block to pass the first stage
     {:ok, socket} = :gen_tcp.listen(6379, [:binary, active: false, reuseaddr: true])
-    {:ok, _client} = :gen_tcp.accept(socket)
+    {:ok, client} = :gen_tcp.accept(socket)
+
+    :ok = :gen_tcp.send(client, "+PONG\r\n")
   end
 end
