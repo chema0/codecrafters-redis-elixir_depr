@@ -44,8 +44,10 @@ defmodule Server do
 
   @spec serve(:gen_tcp.socket()) :: any
   defp serve(socket) do
-    with {:ok, _} <- do_recv(socket) do
-      write(socket, "+PONG\r\n")
+    with {:ok, packet} <- do_recv(socket),
+         {:ok, data, _} <- Parser.parse(packet),
+         {:ok, response} <- check_command(data) do
+      write(socket, response)
       serve(socket)
     end
   end
@@ -56,5 +58,13 @@ defmodule Server do
 
   defp write(socket, packet) do
     :gen_tcp.send(socket, packet)
+  end
+
+  defp check_command(["ping" | _]) do
+    {:ok, "+PONG\r\n"}
+  end
+
+  defp check_command(["echo" | [message]]) do
+    {:ok, "$#{byte_size(message)}\r\n#{message}\r\n"}
   end
 end
