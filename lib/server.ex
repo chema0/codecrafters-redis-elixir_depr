@@ -9,7 +9,8 @@ defmodule Server do
     Supervisor.start_link(
       [
         {Task.Supervisor, name: __MODULE__.TaskSupervisor},
-        {Task, fn -> Server.listen() end}
+        {Task, fn -> Server.listen() end},
+        {Storage, %{}}
       ],
       strategy: :one_for_one
     )
@@ -66,5 +67,15 @@ defmodule Server do
 
   defp check_command(["echo" | [message]]) do
     {:ok, "$#{byte_size(message)}\r\n#{message}\r\n"}
+  end
+
+  defp check_command(["set", key, value]) do
+    Storage.set(key, value)
+    {:ok, "+OK\r\n"}
+  end
+
+  defp check_command(["get", key]) do
+    value = Storage.get(key)
+    {:ok, "$#{byte_size(value)}\r\n#{value}\r\n"}
   end
 end
