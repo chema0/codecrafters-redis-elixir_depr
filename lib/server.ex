@@ -74,8 +74,21 @@ defmodule Server do
     {:ok, "+OK\r\n"}
   end
 
+  defp check_command(["set", key, value, "px", px]) do
+    px = String.to_integer(px)
+
+    Storage.set(key, value, ttl: px)
+
+    {:ok, "+OK\r\n"}
+  end
+
   defp check_command(["get", key]) do
-    value = Storage.get(key)
-    {:ok, "$#{byte_size(value)}\r\n#{value}\r\n"}
+    case Storage.get(key) do
+      nil ->
+        {:ok, "$-1\r\n"}
+
+      value ->
+        {:ok, "$#{byte_size(value)}\r\n#{value}\r\n"}
+    end
   end
 end
